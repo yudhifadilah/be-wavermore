@@ -1,31 +1,70 @@
-# Fyneeds Transcript Backend
+# Wevermore Transcript Backend
 
-Backend Golang tanpa Docker untuk menerima transcript gzip dari bot, menyimpan file secara persistent, memverifikasi signature upload, dan menerbitkan URL publik yang kedaluwarsa.
+Backend Node.js Express untuk menerima transcript gzip dari bot, memverifikasi upload signature, menyimpan transcript, lalu membuat URL publik yang memiliki `uaid`, `exp`, dan `sig`.
 
-## Keamanan URL
-
-- ID publik berupa SHA-256 hash 64 karakter dan tidak memakai nomor channel sebagai path publik.
-- Setiap URL membawa `uaid`, `exp`, dan `sig`.
-- `sig` adalah HMAC-SHA256 atas `id.uaid.exp`, sehingga UAID tidak dapat diganti tanpa membuat signature tidak valid.
-- Masa berlaku default adalah 7 jam.
-- Upload bot memakai HMAC-SHA256 terpisah atas `timestamp`, `uaid`, dan SHA-256 payload gzip.
-- Backend membatasi ukuran terkompresi dan hasil dekompresi.
+Project ini sudah disiapkan untuk deploy ke Vercel. Untuk production, gunakan Vercel Blob supaya transcript tetap tersimpan selama URL masih aktif.
 
 ## Endpoint
 
-- `POST /api/v1/transcripts` — khusus bot, body wajib gzip.
-- `GET /api/v1/transcripts/{hash}` — data JSON untuk frontend dengan signed query.
-- `GET /api/v1/transcripts/{hash}/download?format=html` — download HTML.
-- `GET /api/v1/transcripts/{hash}/download?format=gzip` — download JSON.GZ asli.
-- `GET /healthz` — health check.
+- `POST /api/v1/transcripts` - upload transcript dari bot, body wajib gzip.
+- `GET /api/v1/transcripts/:id` - data JSON transcript untuk frontend.
+- `GET /api/v1/transcripts/:id/download?format=html` - download HTML.
+- `GET /api/v1/transcripts/:id/download?format=gzip` - download JSON.GZ asli.
+- `GET /healthz` - health check.
 
-## Menjalankan
+## Environment Variables
+
+Copy `.env.example` menjadi `.env` untuk lokal.
 
 ```bash
 cp .env.example .env
-go test ./...
-go build -trimpath -ldflags="-s -w" -o fyneeds-transcript-backend ./cmd/server
-./fyneeds-transcript-backend
 ```
 
-Pastikan `TRANSCRIPT_STORAGE_DIR` menggunakan volume atau disk persistent pada penyedia hosting. Backend menghapus file kedaluwarsa secara berkala.
+Wajib diisi:
+
+- `TRANSCRIPT_UPLOAD_SECRET` harus sama dengan secret upload pada bot.
+- `TRANSCRIPT_SIGNING_SECRET` minimal 32 karakter.
+- `BACKEND_PUBLIC_URL` isi dengan URL backend Vercel.
+- `FRONTEND_PUBLIC_URL` isi dengan URL frontend transcript.
+- `CORS_ALLOWED_ORIGIN` isi dengan URL frontend, atau `*` jika benar-benar diperlukan.
+- `BLOB_READ_WRITE_TOKEN` isi dari Vercel Blob Storage.
+
+## Deploy ke Vercel
+
+1. Buat project baru di Vercel dari folder ini.
+2. Tambahkan Vercel Blob Storage ke project.
+3. Isi semua environment variable sesuai `.env.example`.
+4. Deploy.
+
+`vercel.json` sudah mengarahkan semua request ke `api/index.js`, jadi endpoint lama tetap sama.
+
+## Menjalankan Lokal
+
+```bash
+npm install
+npm test
+npm run dev
+```
+
+Jika `BLOB_READ_WRITE_TOKEN` kosong dan `TRANSCRIPT_STORAGE_PROVIDER=filesystem`, transcript lokal disimpan ke `TRANSCRIPT_STORAGE_DIR`.
+
+## Signature Upload dari Bot
+
+Backend tetap kompatibel dengan format lama:
+
+```text
+HMAC_SHA256(TRANSCRIPT_UPLOAD_SECRET, timestamp + "\n" + uaid + "\n" + sha256(gzip_body))
+```
+
+Header yang wajib dikirim bot:
+
+- `Content-Encoding: gzip`
+- `X-Fyneeds-Timestamp`
+- `X-Fyneeds-UAID`
+- `X-Fyneeds-Signature`
+
+URL public transcript memakai:
+
+```text
+HMAC_SHA256(TRANSCRIPT_SIGNING_SECRET, id + "." + uaid + "." + exp)
+```

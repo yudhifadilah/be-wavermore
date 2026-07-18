@@ -1,0 +1,21 @@
+{
+  "name": "wevermore-transcript-backend",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Express transcript backend ready for Vercel.",
+  "type": "commonjs",
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "scripts": {
+    "dev": "node server.js",
+    "start": "node server.js",
+    "test": "node --test",
+    "check": "node --check api/index.js && node --check server.js && find src test -name '*.js' -print0 | xargs -0 -n1 node --check"
+  },
+  "dependencies": {
+    "@vercel/blob": "^2.6.1",
+    "dotenv": "^17.2.1",
+    "express": "^5.1.0"
+  }
+}
